@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    name: Build and package extension
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to upload release assets
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set version from release tag
+        # Strip the leading 'v' from the tag name (e.g. v1.2.3 → 1.2.3)
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "Setting version to $VERSION"
+          npm version "$VERSION" --no-git-tag-version
+
+      - name: Build (production bundle)
+        run: npm run bundle
+
+      - name: Package extension
+        # --no-dependencies: node_modules are already bundled by esbuild into dist/extension.js
+        run: npx vsce package --no-dependencies
+
+      - name: Upload VSIX to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: '*.vsix'

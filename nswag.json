@@ -1,0 +1,23 @@
+{
+  "runtime": "Net80",
+  "documentGenerator": {
+    "fromDocument": {
+      "url": "https://raw.githubusercontent.com/tilt-dev/api.tilt.dev/refs/heads/main/openapi-spec/swagger.json",
+      "output": null,
+      "newLineBehavior": "Auto"
+    }
+  },
+  "codeGenerators": {
+    "openApiToTypeScriptClient": {
+      "output": "src/generated/tilt-api.ts",
+      "template": "Fetch",
+      "generateClientClasses": true,
+      "generateClientInterfaces": false,
+      "typeStyle": "Interface",
+      "dateTimeType": "Date",
+      "nullValue": "Undefined",
+      "generateOptionalParameters": false,
+      "className": "TiltApiClient"
+    }
+  }
+}

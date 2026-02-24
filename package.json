@@ -1,0 +1,196 @@
+{
+  "name": "tiltshift",
+  "displayName": "TiltShift",
+  "description": "Manage Tilt on remote machines via VS Code Remote extensions, with port forwarding for the Tilt UI and exposed services",
+  "version": "0.0.1",
+  "publisher": "tiltshift",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "extensionKind": [
+    "workspace"
+  ],
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "tilt",
+    "kubernetes",
+    "remote",
+    "devops",
+    "port-forwarding"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "tiltshift.start",
+        "title": "Start Tilt",
+        "category": "TiltShift",
+        "icon": "$(play)"
+      },
+      {
+        "command": "tiltshift.stop",
+        "title": "Stop Tilt",
+        "category": "TiltShift",
+        "icon": "$(stop-circle)"
+      },
+      {
+        "command": "tiltshift.restart",
+        "title": "Restart Tilt",
+        "category": "TiltShift",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "tiltshift.openUI",
+        "title": "Open Tilt UI",
+        "category": "TiltShift",
+        "icon": "$(browser)"
+      },
+      {
+        "command": "tiltshift.refresh",
+        "title": "Refresh",
+        "category": "TiltShift",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "tiltshift.openLink",
+        "title": "Open Link",
+        "category": "TiltShift",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "tiltshift.connectToExisting",
+        "title": "Connect to Running Tilt",
+        "category": "TiltShift",
+        "icon": "$(plug)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "tiltshift-sidebar",
+          "title": "TiltShift",
+          "icon": "$(server-process)"
+        }
+      ]
+    },
+    "views": {
+      "tiltshift-sidebar": [
+        {
+          "id": "tiltshift.resourcesView",
+          "name": "Resources",
+          "contextualTitle": "TiltShift Resources"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "tiltshift.start",
+          "when": "view == tiltshift.resourcesView && tiltshift.status != running",
+          "group": "navigation@1"
+        },
+        {
+          "command": "tiltshift.stop",
+          "when": "view == tiltshift.resourcesView && tiltshift.status == running",
+          "group": "navigation@1"
+        },
+        {
+          "command": "tiltshift.openUI",
+          "when": "view == tiltshift.resourcesView && tiltshift.status == running",
+          "group": "navigation@2"
+        },
+        {
+          "command": "tiltshift.refresh",
+          "when": "view == tiltshift.resourcesView",
+          "group": "navigation@3"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "tiltshift.openLink",
+          "when": "viewItem == tiltshift.link",
+          "group": "inline"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "tiltshift.openLink",
+          "when": "false"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "TiltShift",
+      "properties": {
+        "tiltshift.tiltPort": {
+          "type": "number",
+          "default": 10350,
+          "description": "Port that Tilt UI listens on (default: 10350)"
+        },
+        "tiltshift.tiltfilePath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to Tiltfile relative to workspace root. Leave empty to use `Tiltfile` in the workspace root."
+        },
+        "tiltshift.autoConnect": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically connect to a running Tilt instance when opening the workspace"
+        },
+        "tiltshift.autoForwardUI": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically forward the Tilt UI port when connected to Tilt"
+        },
+        "tiltshift.pollInterval": {
+          "type": "number",
+          "default": 2000,
+          "description": "How often (ms) to poll the Tilt API for resource updates"
+        },
+        "tiltshift.tiltArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Additional arguments to pass to `tilt up`"
+        },
+        "tiltshift.autoForwardStatuses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["ok", "pending"],
+          "description": "Runtime statuses for which endpoint links are automatically port-forwarded. When a resource has any other status, its ports are cleared from the extension's tracking."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run bundle",
+    "bundle": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --minify",
+    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap",
+    "watch": "npm run build -- --watch",
+    "typecheck": "tsc --noEmit",
+    "generate": "nswag openapi2tsclient /input:https://raw.githubusercontent.com/tilt-dev/api.tilt.dev/refs/heads/main/openapi-spec/swagger.json /output:src/generated/tilt-api.ts /template:Fetch /className:TiltApiClient /typeStyle:Interface /dateTimeType:Date /nullValue:Undefined /generateOptionalParameters:false /excludedParameterNames:continue",
+    "package": "vsce package",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@types/ws": "^8.18.1",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^2.24.0",
+    "esbuild": "^0.20.0",
+    "nswag": "^14.0.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "ws": "^8.19.0"
+  }
+}

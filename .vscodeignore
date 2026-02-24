@@ -1,0 +1,9 @@
+.vscode/**
+.github/**
+.gitignore
+src/**
+tsconfig.json
+nswag.json
+node_modules/**
+**/*.map
+!dist/**
