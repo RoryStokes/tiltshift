@@ -66,6 +66,17 @@
         "title": "Connect to Running Tilt",
         "category": "TiltShift",
         "icon": "$(plug)"
+      },
+      {
+        "command": "tiltshift.disconnect",
+        "title": "Disconnect from Tilt",
+        "category": "TiltShift",
+        "icon": "$(debug-disconnect)"
+      },
+      {
+        "command": "tiltshift.openResourceLog",
+        "title": "Open Resource Log",
+        "category": "TiltShift"
       }
     ],
     "viewsContainers": {
@@ -73,7 +84,7 @@
         {
           "id": "tiltshift-sidebar",
           "title": "TiltShift",
-          "icon": "$(server-process)"
+          "icon": "tiltshift.png"
         }
       ]
     },
@@ -104,9 +115,14 @@
           "group": "navigation@2"
         },
         {
+          "command": "tiltshift.disconnect",
+          "when": "view == tiltshift.resourcesView && (tiltshift.status == connected || tiltshift.status == connecting)",
+          "group": "navigation@3"
+        },
+        {
           "command": "tiltshift.refresh",
           "when": "view == tiltshift.resourcesView",
-          "group": "navigation@3"
+          "group": "navigation@4"
         }
       ],
       "view/item/context": [
@@ -119,6 +135,10 @@
       "commandPalette": [
         {
           "command": "tiltshift.openLink",
+          "when": "false"
+        },
+        {
+          "command": "tiltshift.openResourceLog",
           "when": "false"
         }
       ]

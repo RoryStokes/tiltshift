@@ -15,6 +15,9 @@ export interface UIResourceItem {
   updateStatus: string;
   links: Array<{ name: string; url: string }>;
   order: number;
+  labels: Array<{ key: string; value: string }>;
+  buildSpanId?: string;
+  runtimeSpanId?: string;
 }
 
 export interface TiltManagerConfig {
@@ -175,35 +178,38 @@ export class TiltManager extends EventEmitter implements vscode.Disposable {
   }
 
   private applyViewFrame(frame: WebViewFrame): void {
-    if (!frame.uiResources) {
-      return; // Frame carries no resource data — nothing to update
-    }
+    // Process resources first so span type registrations are available before log routing
+    if (frame.uiResources) {
+      let upserted = 0;
+      let removed = 0;
 
-    let upserted = 0;
-    let removed = 0;
+      for (const raw of frame.uiResources) {
+        const item = toUIResourceItem(raw);
 
-    for (const raw of frame.uiResources) {
-      const item = toUIResourceItem(raw);
-
-      if (item.runtimeStatus === 'none' && item.updateStatus === 'none') {
-        // Tilt signals this resource is gone
-        const before = this._resources.length;
-        this._resources = this._resources.filter((r) => r.name !== item.name);
-        if (this._resources.length < before) removed++;
-      } else {
-        const idx = this._resources.findIndex((r) => r.name === item.name);
-        if (idx >= 0) {
-          this._resources[idx] = item;
+        if (item.runtimeStatus === 'none' && item.updateStatus === 'none') {
+          // Tilt signals this resource is gone
+          const before = this._resources.length;
+          this._resources = this._resources.filter((r) => r.name !== item.name);
+          if (this._resources.length < before) removed++;
         } else {
-          this._resources.push(item);
+          const idx = this._resources.findIndex((r) => r.name === item.name);
+          if (idx >= 0) {
+            this._resources[idx] = item;
+          } else {
+            this._resources.push(item);
+          }
+          upserted++;
         }
-        upserted++;
       }
+
+      this._resources.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+      this.log.info(`WS frame: ${upserted} upserted, ${removed} removed`);
+      this.emit('resourcesChange', this._resources);
     }
 
-    this._resources.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
-    this.log.info(`WS frame: ${upserted} upserted, ${removed} removed`);
-    this.emit('resourcesChange', this._resources);
+    if (frame.logList) {
+      this.emit('logList', frame.logList);
+    }
   }
 
   private stopWatch(): void {
@@ -237,5 +243,8 @@ function toUIResourceItem(r: UIResource): UIResourceItem {
       .filter((l) => l.url)
       .map((l) => ({ name: l.name ?? l.url ?? '', url: l.url ?? '' })),
     order: status.order ?? 0,
+    labels: Object.entries(r.metadata?.labels ?? {}).map(([key, value]) => ({ key, value })),
+    buildSpanId: status.currentBuild?.spanID ?? status.buildHistory?.[0]?.spanID,
+    runtimeSpanId: status.k8sResourceInfo?.spanID,
   };
 }

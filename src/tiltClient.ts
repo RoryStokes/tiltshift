@@ -14,16 +14,38 @@ export interface UIResourceStatus {
   updateStatus?: string;
   endpointLinks?: UIResourceLink[];
   order?: number;
+  currentBuild?: { spanID?: string };
+  buildHistory?: Array<{ spanID?: string }>;
+  k8sResourceInfo?: { spanID?: string };
 }
 
 export interface UIResource {
-  metadata?: { name?: string };
+  metadata?: { name?: string; labels?: Record<string, string> };
   status?: UIResourceStatus;
+}
+
+export interface LogSpan {
+  manifestName?: string;
+}
+
+export interface LogSegment {
+  spanId?: string;
+  time?: string;
+  text?: string;
+  level?: string;
+}
+
+export interface LogList {
+  fromCheckpoint?: number;
+  toCheckpoint?: number;
+  spans?: Record<string, LogSpan>;
+  segments?: LogSegment[];
 }
 
 /** Top-level shape of a WebSocket frame from /ws/view. */
 export interface WebViewFrame {
   uiResources?: UIResource[];
+  logList?: LogList;
 }
 
 // ─── CSRF token fetch ─────────────────────────────────────────────────────────
@@ -101,8 +123,6 @@ export async function* watchView(
 
     if (frame.uiResources !== undefined) {
       log?.info(`WS frame received — uiResources: ${frame.uiResources.length}`);
-    } else {
-      log?.warn('WS frame received — no uiResources field');
     }
 
     queue.push(frame);

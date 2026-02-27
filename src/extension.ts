@@ -2,9 +2,11 @@ import * as vscode from 'vscode';
 import { TiltManager } from './tiltManager';
 import type { TiltManagerConfig, UIResourceItem } from './tiltManager';
 import { PortForwarder } from './portForwarder';
+import { SpanLogger } from './spanLogger';
 import { TiltStatusBar } from './statusBar';
 import { TiltTreeProvider } from './tiltTreeProvider';
 import { Logger } from './logger';
+import type { LogList } from './tiltClient';
 
 export function activate(context: vscode.ExtensionContext): void {
   const config = readConfig();
@@ -17,6 +19,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const manager = new TiltManager(config, log);
   const portForwarder = new PortForwarder(log);
+  const spanLogger = new SpanLogger();
   const statusBar = new TiltStatusBar(manager);
   const treeProvider = new TiltTreeProvider(manager, portForwarder);
 
@@ -71,7 +74,42 @@ export function activate(context: vscode.ExtensionContext): void {
     'tiltshift.connectToExisting',
     () => {
       log.info('Command: connectToExisting');
+      if (manager.status === 'connected' || manager.status === 'connecting') {
+        log.info('Already connected — refreshing connection');
+        manager.disconnect();
+        portForwarder.reset();
+        spanLogger.reset();
+      }
       void manager.connect();
+    },
+  );
+
+  const disconnect = vscode.commands.registerCommand('tiltshift.disconnect', () => {
+    log.info('Command: disconnect');
+    manager.disconnect();
+    portForwarder.reset();
+  });
+
+  const openResourceLog = vscode.commands.registerCommand(
+    'tiltshift.openResourceLog',
+    async (resourceName: string, type: 'build' | 'runtime') => {
+      let ch = spanLogger.getChannel(resourceName, type);
+      // For resources without a runtime span (e.g. local jobs), fall back to the build log
+      if (!ch && type === 'runtime') ch = spanLogger.getChannel(resourceName, 'build');
+      if (!ch) {
+        void vscode.window.showInformationMessage(
+          `No log output received yet for "${resourceName}"`,
+        );
+        return;
+      }
+      // show() registers the output: document in vscode.workspace.textDocuments
+      ch.show(true);
+      const doc = vscode.workspace.textDocuments.find(
+        (d) => d.uri.scheme === 'output' && d.uri.toString().includes(ch.name),
+      );
+      if (doc) {
+        await vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true });
+      }
     },
   );
 
@@ -109,6 +147,12 @@ export function activate(context: vscode.ExtensionContext): void {
   // ── Auto-forward resource endpoint links ──────────────────────────────────
 
   manager.on('resourcesChange', (resources: UIResourceItem[]) => {
+    // Register build/runtime span IDs so SpanLogger can route log segments correctly
+    for (const r of resources) {
+      if (r.buildSpanId)   spanLogger.registerSpan(r.buildSpanId,   'build',   r.name);
+      if (r.runtimeSpanId) spanLogger.registerSpan(r.runtimeSpanId, 'runtime', r.name);
+    }
+
     const statuses = vscode.workspace.getConfiguration('tiltshift')
       .get<string[]>('autoForwardStatuses', ['ok', 'pending']);
     for (const r of resources) {
@@ -124,6 +168,10 @@ export function activate(context: vscode.ExtensionContext): void {
     if (s === 'disconnected' || s === 'error') {
       portForwarder.clearAllLinks();
     }
+  });
+
+  manager.on('logList', (logList: LogList) => {
+    spanLogger.applyLogList(logList);
   });
 
   // Check if Tilt is already running silently on activation
@@ -143,6 +191,7 @@ export function activate(context: vscode.ExtensionContext): void {
     channel,
     manager,
     portForwarder,
+    spanLogger,
     statusBar,
     treeProvider,
     treeView,
@@ -151,6 +200,8 @@ export function activate(context: vscode.ExtensionContext): void {
     restart,
     openUI,
     connectToExisting,
+    disconnect,
+    openResourceLog,
     refresh,
     openLink,
     onConfigChange,

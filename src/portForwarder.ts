@@ -94,6 +94,15 @@ export class PortForwarder implements vscode.Disposable {
   }
 
   /**
+   * Clears all forwarding state including the full URL cache.
+   * Call this before a deliberate reconnect so every port is re-forwarded fresh.
+   */
+  reset(): void {
+    this.clearAllLinks();
+    this.cache.clear();
+  }
+
+  /**
    * Clears port tracking for all resources.
    * Called when Tilt disconnects or errors.
    */
