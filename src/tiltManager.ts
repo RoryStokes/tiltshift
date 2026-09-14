@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { EventEmitter } from 'events';
-import { fetchCsrfToken, watchView } from './tiltClient';
+import { fetchCsrfToken, fetchSessionCookie, watchView } from './tiltClient';
 import type { UIResource, WebViewFrame } from './tiltClient';
 import type { Logger } from './logger';
 
@@ -72,9 +72,24 @@ export class TiltManager extends EventEmitter implements vscode.Disposable {
     this.log.info(`Connecting to Tilt at http://localhost:${this.config.port}/`);
     this.setStatus('connecting');
 
+    let cookie: string | undefined;
+    try {
+      cookie = await fetchSessionCookie(this.config.port);
+      this.log.info(
+        cookie ? 'Tilt session cookie obtained' : 'Tilt set no session cookie — continuing without one',
+      );
+    } catch (err) {
+      this.log.error(
+        `Failed to fetch session cookie from http://localhost:${this.config.port}/`,
+        err,
+      );
+      this.setStatus('error');
+      return;
+    }
+
     let token: string;
     try {
-      token = await fetchCsrfToken(this.config.port);
+      token = await fetchCsrfToken(this.config.port, cookie);
       this.log.info(`CSRF token fetched — opening WebSocket`);
     } catch (err) {
       this.log.error(
@@ -86,7 +101,7 @@ export class TiltManager extends EventEmitter implements vscode.Disposable {
     }
 
     this.setStatus('connected');
-    this.startWatch(token);
+    this.startWatch(token, cookie);
   }
 
   disconnect(): void {
@@ -146,12 +161,12 @@ export class TiltManager extends EventEmitter implements vscode.Disposable {
 
   // ── Internal watch management ──────────────────────────────────────────────
 
-  private startWatch(token: string): void {
+  private startWatch(token: string, cookie?: string): void {
     this.stopWatch();
     this._watchAbort = new AbortController();
     this.log.info('WebSocket watch stream starting');
 
-    this.runWatchLoop(token, this._watchAbort.signal).catch((err: unknown) => {
+    this.runWatchLoop(token, this._watchAbort.signal, cookie).catch((err: unknown) => {
       if (this._watchAbort?.signal.aborted) {
         // Clean shutdown — not an error
         return;
@@ -161,8 +176,8 @@ export class TiltManager extends EventEmitter implements vscode.Disposable {
     });
   }
 
-  private async runWatchLoop(token: string, signal: AbortSignal): Promise<void> {
-    for await (const frame of watchView(this.config.port, token, signal, this.log)) {
+  private async runWatchLoop(token: string, signal: AbortSignal, cookie?: string): Promise<void> {
+    for await (const frame of watchView(this.config.port, token, signal, this.log, cookie)) {
       if (signal.aborted) break;
       this.applyViewFrame(frame);
     }

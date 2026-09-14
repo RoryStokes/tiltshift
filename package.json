@@ -2,7 +2,7 @@
   "name": "tiltshift",
   "displayName": "TiltShift",
   "description": "Manage Tilt on remote machines via VS Code Remote extensions, with port forwarding for the Tilt UI and exposed services",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "tiltshift",
   "repository": "https://github.com/RoryStokes/tiltshift",
   "engines": {
